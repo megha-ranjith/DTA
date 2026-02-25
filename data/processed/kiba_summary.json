@@ -1,0 +1,13 @@
+{
+  "dataset": "kiba",
+  "num_samples": 118254,
+  "split_counts": {
+    "train": 78836,
+    "test": 19709,
+    "val": 19709
+  },
+  "num_unique_drugs": 2111,
+  "num_unique_targets": 229,
+  "affinity_min": 0.0,
+  "affinity_max": 17.200179498
+}

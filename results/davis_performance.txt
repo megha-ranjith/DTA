@@ -1,0 +1,7 @@
+Evaluation on davis:
+[Testing] Loss: 0.718339
+[Metrics]
+  - Concordance Index (CI): 0.688416
+  - Mean Squared Error (MSE): 0.718339
+  - Pearson Correlation (R): 0.333132
+  - RMSE: 0.847549

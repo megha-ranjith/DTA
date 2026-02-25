@@ -1,0 +1,13 @@
+{
+  "dataset": "pdbbind_v2016",
+  "num_samples": 3835,
+  "split_counts": {
+    "train": 3068,
+    "test": 384,
+    "val": 383
+  },
+  "num_unique_drugs": 263,
+  "num_unique_targets": 263,
+  "affinity_min": 2.0,
+  "affinity_max": 11.92
+}

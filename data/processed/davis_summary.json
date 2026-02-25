@@ -1,0 +1,13 @@
+{
+  "dataset": "davis",
+  "num_samples": 30056,
+  "split_counts": {
+    "train": 20036,
+    "test": 5010,
+    "val": 5010
+  },
+  "num_unique_drugs": 68,
+  "num_unique_targets": 442,
+  "affinity_min": 5.0,
+  "affinity_max": 10.795880017344075
+}
