@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import pandas as pd
 import torch
@@ -27,7 +27,7 @@ class DTADataset(Dataset):
         dataframe: pd.DataFrame,
         drug_id_to_index: Dict[str, int],
         target_id_to_index: Dict[str, int],
-        max_protein_len: int = 1024,
+        max_protein_len: int = 1000,
     ) -> None:
         required_cols = {"drug_id", "target_id", "smiles", "fasta", "affinity"}
         missing = required_cols - set(dataframe.columns)
@@ -39,16 +39,16 @@ class DTADataset(Dataset):
         self.target_id_to_index = target_id_to_index
         self.max_protein_len = max_protein_len
 
-        self._target_cache: Dict[str, Tuple[torch.Tensor, torch.Tensor]] = {}
+        self._target_cache: Dict[str, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]] = {}
 
     def __len__(self) -> int:
         return len(self.df)
 
-    def _get_target_features(self, fasta: str) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _get_target_features(self, fasta: str) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         if fasta not in self._target_cache:
             self._target_cache[fasta] = protein_sequence_to_tensor(fasta, max_len=self.max_protein_len)
-        feat, mask = self._target_cache[fasta]
-        return feat.clone(), mask.clone()
+        token_ids, physchem, mask = self._target_cache[fasta]
+        return token_ids.clone(), physchem.clone(), mask.clone()
 
     def __getitem__(self, idx: int) -> Dict[str, object]:
         row = self.df.iloc[idx]
@@ -59,12 +59,17 @@ class DTADataset(Dataset):
         affinity = float(row["affinity"])
 
         graph: Data = smiles_to_graph(smiles)
-        graph = Data(x=graph.x.clone(), edge_index=graph.edge_index.clone())
-        target_feat, target_mask = self._get_target_features(fasta)
+        graph = Data(
+            x=graph.x.clone(),
+            edge_index=graph.edge_index.clone(),
+            edge_attr=graph.edge_attr.clone(),
+        )
+        target_tokens, target_physchem, target_mask = self._get_target_features(fasta)
 
         return {
             "drug_graph": graph,
-            "target_feat": target_feat,
+            "target_tokens": target_tokens,
+            "target_physchem": target_physchem,
             "target_mask": target_mask,
             "affinity": affinity,
             "drug_node_id": self.drug_id_to_index[drug_id],
@@ -78,7 +83,8 @@ def collate_dta_batch(samples: List[Dict[str, object]]) -> Dict[str, torch.Tenso
     drug_graphs = [sample["drug_graph"] for sample in samples]
     drug_batch = Batch.from_data_list(drug_graphs)
 
-    target_feat = torch.stack([sample["target_feat"] for sample in samples], dim=0)
+    target_tokens = torch.stack([sample["target_tokens"] for sample in samples], dim=0)
+    target_physchem = torch.stack([sample["target_physchem"] for sample in samples], dim=0)
     target_mask = torch.stack([sample["target_mask"] for sample in samples], dim=0)
     affinity = torch.tensor([sample["affinity"] for sample in samples], dtype=torch.float32)
     drug_node_id = torch.tensor([sample["drug_node_id"] for sample in samples], dtype=torch.long)
@@ -86,11 +92,14 @@ def collate_dta_batch(samples: List[Dict[str, object]]) -> Dict[str, torch.Tenso
 
     return {
         "drug_graph": drug_batch,
-        "target_feat": target_feat,
+        "target_tokens": target_tokens,
+        "target_physchem": target_physchem,
         "target_mask": target_mask,
         "affinity": affinity,
         "drug_node_id": drug_node_id,
         "target_node_id": target_node_id,
+        "smiles": [str(sample["smiles"]) for sample in samples],
+        "fasta": [str(sample["fasta"]) for sample in samples],
     }
 
 
@@ -102,7 +111,7 @@ def _build_node_maps(df: pd.DataFrame) -> Tuple[Dict[str, int], Dict[str, int]]:
     return drug_map, target_map
 
 
-def build_split_datasets(processed_csv_path: Path, max_protein_len: int = 1024) -> SplitDatasets:
+def build_split_datasets(processed_csv_path: Path, max_protein_len: int = 1000) -> SplitDatasets:
     df = pd.read_csv(processed_csv_path)
     if "split" not in df.columns:
         raise ValueError("Processed dataset must include a 'split' column.")
@@ -126,4 +135,3 @@ def build_split_datasets(processed_csv_path: Path, max_protein_len: int = 1024) 
         drug_id_to_index=drug_map,
         target_id_to_index=target_map,
     )
-

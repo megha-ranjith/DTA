@@ -18,7 +18,7 @@ def main() -> None:
         "--dataset",
         type=str,
         default="all",
-        choices=["all", "davis", "kiba", "pdbbind_v2016"],
+        choices=["all", "davis", "kiba", "core2016", "test71", "test105", "pdbbind_v2016"],
         help="Dataset to prepare.",
     )
     parser.add_argument("--data-root", type=Path, default=PROJECT_ROOT / "data")
@@ -34,7 +34,7 @@ def main() -> None:
             force_preprocess=args.force_preprocess,
             seed=args.seed,
         )
-        print("Prepared datasets: davis, kiba, pdbbind_v2016")
+        print("Prepared datasets: davis, kiba, core2016, test71, test105, pdbbind_v2016")
     else:
         out_path = prepare_dataset(
             dataset=args.dataset,
@@ -48,4 +48,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

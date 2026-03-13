@@ -5,6 +5,7 @@ from typing import Dict
 
 
 GRAPH_DTA_BASE = "https://raw.githubusercontent.com/thinng/GraphDTA/master/data"
+DATADTA_BASE = "https://raw.githubusercontent.com/YanZhu06/DataDTA/master/data"
 
 
 @dataclass(frozen=True)
@@ -47,5 +48,43 @@ BENCHMARKS: Dict[str, BenchmarkSpec] = {
             "refined entries with deposition date <= 2016-12-31."
         ),
     ),
+    "core2016": BenchmarkSpec(
+        name="core2016",
+        raw_files={
+            "affinity_data.csv": f"{DATADTA_BASE}/affinity_data.csv",
+            "training_smi.csv": f"{DATADTA_BASE}/training_smi.csv",
+            "training_seq_.csv": f"{DATADTA_BASE}/training_seq_.csv",
+            "validation_smi.csv": f"{DATADTA_BASE}/validation_smi.csv",
+            "validation_seq_.csv": f"{DATADTA_BASE}/validation_seq_.csv",
+            "test_smi.csv": f"{DATADTA_BASE}/test_smi.csv",
+            "test_seq_.csv": f"{DATADTA_BASE}/test_seq_.csv",
+        },
+        description="PDBbind Core2016 split packaged in the DataDTA benchmark release.",
+    ),
+    "test71": BenchmarkSpec(
+        name="test71",
+        raw_files={
+            "affinity_data.csv": f"{DATADTA_BASE}/affinity_data.csv",
+            "training_smi.csv": f"{DATADTA_BASE}/training_smi.csv",
+            "training_seq_.csv": f"{DATADTA_BASE}/training_seq_.csv",
+            "validation_smi.csv": f"{DATADTA_BASE}/validation_smi.csv",
+            "validation_seq_.csv": f"{DATADTA_BASE}/validation_seq_.csv",
+            "test71_smi.csv": f"{DATADTA_BASE}/test71_smi.csv",
+            "test71_seq_.csv": f"{DATADTA_BASE}/test71_seq_.csv",
+        },
+        description="PDBbind Test71 split packaged in the DataDTA benchmark release.",
+    ),
+    "test105": BenchmarkSpec(
+        name="test105",
+        raw_files={
+            "affinity_data.csv": f"{DATADTA_BASE}/affinity_data.csv",
+            "training_smi.csv": f"{DATADTA_BASE}/training_smi.csv",
+            "training_seq_.csv": f"{DATADTA_BASE}/training_seq_.csv",
+            "validation_smi.csv": f"{DATADTA_BASE}/validation_smi.csv",
+            "validation_seq_.csv": f"{DATADTA_BASE}/validation_seq_.csv",
+            "test105_smi.csv": f"{DATADTA_BASE}/test105_smi.csv",
+            "test105_seq_.csv": f"{DATADTA_BASE}/test105_seq_.csv",
+        },
+        description="PDBbind Test105 split packaged in the DataDTA benchmark release.",
+    ),
 }
-

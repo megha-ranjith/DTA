@@ -20,13 +20,14 @@ from gcdta.train_utils import to_device
 
 def build_single_batch(smiles: str, fasta: str, max_protein_len: int) -> dict:
     graph: Data = smiles_to_graph(smiles)
-    graph = Data(x=graph.x.clone(), edge_index=graph.edge_index.clone())
+    graph = Data(x=graph.x.clone(), edge_index=graph.edge_index.clone(), edge_attr=graph.edge_attr.clone())
     drug_graph = Batch.from_data_list([graph])
-    target_feat, target_mask = protein_sequence_to_tensor(fasta, max_len=max_protein_len)
+    target_tokens, target_physchem, target_mask = protein_sequence_to_tensor(fasta, max_len=max_protein_len)
 
     return {
         "drug_graph": drug_graph,
-        "target_feat": target_feat.unsqueeze(0),
+        "target_tokens": target_tokens.unsqueeze(0),
+        "target_physchem": target_physchem.unsqueeze(0),
         "target_mask": target_mask.unsqueeze(0),
         "affinity": torch.tensor([0.0], dtype=torch.float32),
         "drug_node_id": torch.tensor([0], dtype=torch.long),
@@ -47,7 +48,7 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, config = load_checkpoint(args.model_path, device=device)
 
-    max_len = int(config.get("max_protein_len", 1024))
+    max_len = int(config.get("max_protein_len", 1000))
     batch = build_single_batch(smiles=args.smiles, fasta=args.fasta, max_protein_len=max_len)
 
     start = time.perf_counter()
@@ -68,4 +69,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

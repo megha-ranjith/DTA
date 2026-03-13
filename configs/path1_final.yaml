@@ -1,0 +1,5 @@
+extends: path1_pocket_uncertainty.yaml
+
+results_dir: ./results/path1_final
+epochs: 15
+save_attention_matrix: true

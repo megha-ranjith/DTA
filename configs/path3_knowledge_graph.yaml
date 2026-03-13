@@ -1,0 +1,39 @@
+# Innovation Path 3: Knowledge Graph Zero-Shot Learning
+
+extends: base.yaml
+
+innovations:
+  use_pocket_uncertainty: false
+  use_multitask_pose: false
+  use_knowledge_graph: true
+  use_structural_negatives: false
+
+# Knowledge Graph parameters
+knowledge_graph:
+  use_primekg: true
+  use_graphsage: true  # GraphSAGE for KG embeddings
+  kg_embedding_dim: 128
+  kg_alignment_weight: 0.2  # Weight on semantic alignment
+  use_textual_alignment: true
+  textual_encoder: "pubmedbert"  # or "biobert"
+  
+  # Zero-shot settings
+  zero_shot_mode: true
+  kg_neighbor_aggregation: true
+  num_neighbors: 5
+
+# Training adjustments
+epochs: 15
+batch_size: 64
+lr: 0.0001
+
+# Loss components
+affinity_loss_weight: 1.0
+kg_alignment_weight: 0.2
+contrastive_weight: 0.05
+
+# Enable if you have access to PrimeKG embeddings
+preload_kg_embeddings: false
+
+# Text encoder fine-tuning
+finetune_text_encoder: false

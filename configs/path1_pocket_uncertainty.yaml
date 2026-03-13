@@ -1,0 +1,30 @@
+# Innovation Path 1: Uncertainty-Aware Pocket-Centric Modeling
+
+# Inherit base config
+extends: base.yaml
+
+# Enable this innovation
+innovations:
+  use_pocket_uncertainty: true
+  use_multitask_pose: false
+  use_knowledge_graph: false
+  use_structural_negatives: false
+
+# Pocket-specific settings
+pocket_uncertainty:
+  use_esmfold: true
+  use_mc_dropout: true  # Use MC dropout for uncertainty
+  pocket_radius_angstrom: 8.0
+  gvp_hidden_dim: 128
+  uncertainty_samples: 20  # More samples for better estimates
+  uncertainty_weight: 0.1  # Weight on uncertainty regularization
+
+# Model adjustments for pocket-centric approach
+hidden_dim: 128
+epochs: 15
+batch_size: 32  # Smaller batch with 3D structure computation
+
+# Contrastive learning still active
+contrastive_weight: 0.05
+
+# Note: Training will be slower due to structure generation and GVP encoding

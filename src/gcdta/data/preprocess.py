@@ -62,15 +62,19 @@ def _prepare_davis_or_kiba(dataset: str, raw_dir: Path, seed: int = 42) -> pd.Da
 
     ligand_ids = list(ligands.keys())
     protein_ids = list(proteins.keys())
+    num_proteins = len(protein_ids)
     rows, cols = np.where(~np.isnan(affinity))
 
     records: List[Dict[str, object]] = []
-    for pair_idx, (row_idx, col_idx) in enumerate(zip(rows, cols)):
-        if pair_idx in train_indices_set:
+    for row_idx, col_idx in zip(rows, cols):
+        # Fold files use flat matrix indices: flat_idx = row_idx * num_proteins + col_idx
+        flat_idx = int(row_idx) * num_proteins + int(col_idx)
+        
+        if flat_idx in train_indices_set:
             split = "train"
-        elif pair_idx in val_indices_set:
+        elif flat_idx in val_indices_set:
             split = "val"
-        elif pair_idx in test_indices_set:
+        elif flat_idx in test_indices_set:
             split = "test"
         else:
             # Ignore pairs not present in setting-1 split indices.
@@ -163,6 +167,88 @@ def _prepare_pdbbind_v2016(raw_dir: Path, seed: int = 42) -> pd.DataFrame:
     return out
 
 
+def _load_affinity_lookup(path: Path) -> Dict[str, float]:
+    affinity_df = pd.read_csv(path, sep=None, engine="python")
+    id_col, value_col = affinity_df.columns[:2]
+    return {
+        str(row[id_col]).strip(): float(row[value_col])
+        for _, row in affinity_df.dropna(subset=[id_col, value_col]).iterrows()
+    }
+
+
+def _merge_pdbbind_split(
+    split_name: str,
+    smiles_path: Path,
+    seq_path: Path,
+    affinity_lookup: Dict[str, float],
+    dataset_name: str,
+) -> pd.DataFrame:
+    smiles_df = pd.read_csv(smiles_path)
+    seq_df = pd.read_csv(seq_path)
+    if "id" in seq_df.columns and "pdbid" not in seq_df.columns:
+        seq_df = seq_df.rename(columns={"id": "pdbid"})
+    if "Unnamed: 0" in seq_df.columns:
+        seq_df = seq_df.drop(columns=["Unnamed: 0"])
+    if "pdbid" not in smiles_df.columns or "pdbid" not in seq_df.columns:
+        raise RuntimeError(f"Expected 'pdbid' column in {smiles_path.name} and {seq_path.name}.")
+
+    merged = smiles_df.merge(seq_df[["pdbid", "seq"]], on="pdbid", how="inner")
+    if merged.empty:
+        raise RuntimeError(f"Unable to merge {smiles_path.name} and {seq_path.name}.")
+
+    merged["affinity"] = merged["pdbid"].astype(str).map(affinity_lookup)
+    merged = merged.dropna(subset=["affinity", "smiles", "seq"]).copy()
+    merged["split"] = split_name
+    merged["dataset"] = dataset_name
+    merged["drug_id"] = merged["pdbid"].astype(str) + "_ligand"
+    merged["target_id"] = merged["pdbid"].astype(str) + "_protein"
+    merged["fasta"] = merged["seq"].astype(str)
+    return merged[["dataset", "split", "drug_id", "target_id", "smiles", "fasta", "affinity"]]
+
+
+def _prepare_pdbbind_benchmark(dataset: str, raw_dir: Path) -> pd.DataFrame:
+    affinity_lookup = _load_affinity_lookup(raw_dir / "affinity_data.csv")
+    frames = [
+        _merge_pdbbind_split(
+            split_name="train",
+            smiles_path=raw_dir / "training_smi.csv",
+            seq_path=raw_dir / "training_seq_.csv",
+            affinity_lookup=affinity_lookup,
+            dataset_name=dataset,
+        ),
+        _merge_pdbbind_split(
+            split_name="val",
+            smiles_path=raw_dir / "validation_smi.csv",
+            seq_path=raw_dir / "validation_seq_.csv",
+            affinity_lookup=affinity_lookup,
+            dataset_name=dataset,
+        ),
+    ]
+
+    if dataset == "core2016":
+        test_smi = raw_dir / "test_smi.csv"
+        test_seq = raw_dir / "test_seq_.csv"
+    elif dataset == "test71":
+        test_smi = raw_dir / "test71_smi.csv"
+        test_seq = raw_dir / "test71_seq_.csv"
+    elif dataset == "test105":
+        test_smi = raw_dir / "test105_smi.csv"
+        test_seq = raw_dir / "test105_seq_.csv"
+    else:
+        raise ValueError(f"Unsupported PDBbind benchmark: {dataset}")
+
+    frames.append(
+        _merge_pdbbind_split(
+            split_name="test",
+            smiles_path=test_smi,
+            seq_path=test_seq,
+            affinity_lookup=affinity_lookup,
+            dataset_name=dataset,
+        )
+    )
+    return pd.concat(frames, axis=0, ignore_index=True)
+
+
 def preprocess_dataset(dataset: str, raw_root: Path, processed_root: Path, seed: int = 42) -> Path:
     if dataset not in BENCHMARKS:
         raise ValueError(f"Unknown dataset '{dataset}'.")
@@ -173,6 +259,8 @@ def preprocess_dataset(dataset: str, raw_root: Path, processed_root: Path, seed:
 
     if dataset in {"davis", "kiba"}:
         df = _prepare_davis_or_kiba(dataset=dataset, raw_dir=raw_dir, seed=seed)
+    elif dataset in {"core2016", "test71", "test105"}:
+        df = _prepare_pdbbind_benchmark(dataset=dataset, raw_dir=raw_dir)
     elif dataset == "pdbbind_v2016":
         df = _prepare_pdbbind_v2016(raw_dir=raw_dir, seed=seed)
     else:
@@ -224,4 +312,3 @@ def prepare_all(data_root: Path, force_download: bool = False, force_preprocess:
             force_preprocess=force_preprocess,
             seed=seed,
         )
-

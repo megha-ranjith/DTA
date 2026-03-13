@@ -1,0 +1,37 @@
+# Innovation Path 4: Structural Hard Negatives (Decoy Training)
+
+extends: base.yaml
+
+innovations:
+  use_pocket_uncertainty: false
+  use_multitask_pose: false
+  use_knowledge_graph: false
+  use_structural_negatives: true
+
+# Structural Negatives parameters
+structural_negatives:
+  use_decoydb: true
+  decoy_sampler_type: "structural"  # or "random" for baseline
+  contrastive_weight: 0.3
+  rmsd_weight: true  # Weight negatives by structural similarity
+  
+  # Perturbation strategies
+  perturbation_types: ["conformational", "pocket"]
+  rmsd_threshold: 2.0  # Angstroms
+  
+  # Structural contrastive loss
+  structural_margin: 0.5
+  hard_negative_ratio: 0.3
+
+# Training adjustments
+epochs: 15
+batch_size: 64
+lr: 0.0001
+
+# Loss components
+affinity_loss_weight: 1.0
+structural_contrastive_weight: 0.3
+contrastive_weight: 0.05
+
+# Data loading
+num_workers: 0

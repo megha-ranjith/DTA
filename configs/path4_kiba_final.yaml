@@ -1,0 +1,6 @@
+extends: path4_structural_negatives.yaml
+
+dataset: kiba
+results_dir: ./results/kiba_path4_final
+epochs: 15
+save_attention_matrix: true

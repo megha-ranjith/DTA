@@ -81,6 +81,33 @@ ATOM_SYMBOLS = [
     "Pb",
     "X",
 ]
+FORMAL_CHARGES = [-2, -1, 0, 1, 2, 3, "other"]
+HYBRIDIZATIONS = [
+    Chem.rdchem.HybridizationType.SP,
+    Chem.rdchem.HybridizationType.SP2,
+    Chem.rdchem.HybridizationType.SP3,
+    Chem.rdchem.HybridizationType.SP3D,
+    Chem.rdchem.HybridizationType.SP3D2,
+    "other",
+]
+CHIRALITY_TAGS = [
+    Chem.rdchem.ChiralType.CHI_UNSPECIFIED,
+    Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CW,
+    Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CCW,
+    Chem.rdchem.ChiralType.CHI_OTHER,
+]
+BOND_TYPES = [
+    Chem.rdchem.BondType.SINGLE,
+    Chem.rdchem.BondType.DOUBLE,
+    Chem.rdchem.BondType.TRIPLE,
+    Chem.rdchem.BondType.AROMATIC,
+]
+BOND_STEREOS = [
+    Chem.rdchem.BondStereo.STEREONONE,
+    Chem.rdchem.BondStereo.STEREOANY,
+    Chem.rdchem.BondStereo.STEREOZ,
+    Chem.rdchem.BondStereo.STEREOE,
+]
 
 
 def _normalize_table(table: Dict[str, float]) -> Dict[str, float]:
@@ -419,48 +446,50 @@ RESIDUE_PROPERTIES = {name: _normalize_table(values) for name, values in RAW_RES
 PROPERTY_NAMES = list(RESIDUE_PROPERTIES.keys())
 
 
+def protein_vocab_size() -> int:
+    return len(AMINO_ACIDS)
+
+
+def protein_physchem_dim() -> int:
+    return 19
+
+
 def residue_physchem_vector(residue: str) -> np.ndarray:
-    r = residue if residue in AA_TO_INDEX else "X"
-
+    residue = residue if residue in AA_TO_INDEX else "X"
     group_features = [
-        1.0 if r in GROUP_ALIPHATIC else 0.0,
-        1.0 if r in GROUP_AROMATIC else 0.0,
-        1.0 if r in GROUP_POLAR_NEUTRAL else 0.0,
-        1.0 if r in GROUP_ACIDIC else 0.0,
-        1.0 if r in GROUP_BASIC else 0.0,
+        1.0 if residue in GROUP_ALIPHATIC else 0.0,
+        1.0 if residue in GROUP_AROMATIC else 0.0,
+        1.0 if residue in GROUP_POLAR_NEUTRAL else 0.0,
+        1.0 if residue in GROUP_ACIDIC else 0.0,
+        1.0 if residue in GROUP_BASIC else 0.0,
     ]
-
-    continuous_features = [RESIDUE_PROPERTIES[name][r] for name in PROPERTY_NAMES]
+    continuous_features = [RESIDUE_PROPERTIES[name][residue] for name in PROPERTY_NAMES]
     return np.asarray(group_features + continuous_features, dtype=np.float32)
 
 
-def protein_sequence_to_tensor(sequence: str, max_len: int) -> Tuple[torch.Tensor, torch.Tensor]:
+def protein_sequence_to_tensor(sequence: str, max_len: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     seq = (sequence or "").upper()
-    seq = "".join(ch if ch in AA_TO_INDEX else "X" for ch in seq)
-    if len(seq) > max_len:
-        seq = seq[:max_len]
+    seq = "".join(ch if ch in AA_TO_INDEX else "X" for ch in seq[:max_len])
 
-    feat_dim = len(AMINO_ACIDS) + 19
-    features = np.zeros((max_len, feat_dim), dtype=np.float32)
+    token_ids = np.zeros((max_len,), dtype=np.int64)
+    physchem = np.zeros((max_len, protein_physchem_dim()), dtype=np.float32)
     mask = np.zeros((max_len,), dtype=np.float32)
 
-    for i, aa in enumerate(seq):
-        one_hot = np.zeros((len(AMINO_ACIDS),), dtype=np.float32)
-        one_hot[AA_TO_INDEX[aa]] = 1.0
-        physchem = residue_physchem_vector(aa)
-        features[i] = np.concatenate([one_hot, physchem], axis=0)
-        mask[i] = 1.0
+    for idx, residue in enumerate(seq):
+        token_ids[idx] = AA_TO_INDEX[residue]
+        physchem[idx] = residue_physchem_vector(residue)
+        mask[idx] = 1.0
 
-    return torch.from_numpy(features), torch.from_numpy(mask)
+    return torch.from_numpy(token_ids), torch.from_numpy(physchem), torch.from_numpy(mask)
 
 
-def one_of_k_encoding(x: int | str, allowable_set: List[int | str]) -> List[int]:
+def one_of_k_encoding(x: int | str | object, allowable_set: List[int | str | object]) -> List[int]:
     if x not in allowable_set:
         raise ValueError(f"input {x} not in allowable set")
     return [1 if x == s else 0 for s in allowable_set]
 
 
-def one_of_k_encoding_unk(x: int | str, allowable_set: List[int | str]) -> List[int]:
+def one_of_k_encoding_unk(x: int | str | object, allowable_set: List[int | str | object]) -> List[int]:
     if x not in allowable_set:
         x = allowable_set[-1]
     return [1 if x == s else 0 for s in allowable_set]
@@ -469,20 +498,36 @@ def one_of_k_encoding_unk(x: int | str, allowable_set: List[int | str]) -> List[
 def atom_features(atom: Chem.rdchem.Atom) -> np.ndarray:
     features = (
         one_of_k_encoding_unk(atom.GetSymbol(), ATOM_SYMBOLS)
-        + one_of_k_encoding(atom.GetDegree(), list(range(11)))
-        + one_of_k_encoding_unk(atom.GetTotalNumHs(), list(range(11)))
-        + one_of_k_encoding_unk(atom.GetImplicitValence(), list(range(11)))
+        + one_of_k_encoding_unk(atom.GetDegree(), list(range(6)) + ["other"])
+        + one_of_k_encoding_unk(atom.GetFormalCharge(), FORMAL_CHARGES)
+        + one_of_k_encoding_unk(atom.GetHybridization(), HYBRIDIZATIONS)
         + [1 if atom.GetIsAromatic() else 0]
+        + [1 if atom.IsInRing() else 0]
+        + one_of_k_encoding_unk(atom.GetChiralTag(), CHIRALITY_TAGS)
     )
-    arr = np.asarray(features, dtype=np.float32)
-    arr_sum = float(arr.sum())
-    if arr_sum > 0:
-        arr = arr / arr_sum
-    return arr
+    return np.asarray(features, dtype=np.float32)
+
+
+def bond_features(bond: Chem.rdchem.Bond | None) -> np.ndarray:
+    if bond is None:
+        return np.asarray([0.0] * (len(BOND_TYPES) + 1 + 1 + len(BOND_STEREOS)) + [1.0], dtype=np.float32)
+
+    features = (
+        one_of_k_encoding_unk(bond.GetBondType(), BOND_TYPES)
+        + [1 if bond.GetIsConjugated() else 0]
+        + [1 if bond.IsInRing() else 0]
+        + one_of_k_encoding_unk(bond.GetStereo(), BOND_STEREOS)
+        + [0]
+    )
+    return np.asarray(features, dtype=np.float32)
 
 
 def atom_feature_dim() -> int:
-    return len(ATOM_SYMBOLS) + 11 + 11 + 11 + 1
+    return len(ATOM_SYMBOLS) + 7 + len(FORMAL_CHARGES) + len(HYBRIDIZATIONS) + 1 + 1 + len(CHIRALITY_TAGS)
+
+
+def bond_feature_dim() -> int:
+    return len(BOND_TYPES) + 1 + 1 + len(BOND_STEREOS) + 1
 
 
 @lru_cache(maxsize=200000)
@@ -491,23 +536,23 @@ def smiles_to_graph(smiles: str) -> Data:
     if mol is None:
         raise ValueError(f"Invalid SMILES: {smiles}")
 
-    features = [atom_features(atom) for atom in mol.GetAtoms()]
-    x = torch.tensor(np.stack(features), dtype=torch.float32)
+    x = torch.tensor(np.stack([atom_features(atom) for atom in mol.GetAtoms()]), dtype=torch.float32)
 
-    edges = []
+    edges: List[Tuple[int, int]] = []
+    edge_features: List[np.ndarray] = []
     for bond in mol.GetBonds():
-        a = bond.GetBeginAtomIdx()
-        b = bond.GetEndAtomIdx()
-        edges.append((a, b))
-        edges.append((b, a))
+        begin = bond.GetBeginAtomIdx()
+        end = bond.GetEndAtomIdx()
+        attr = bond_features(bond)
+        edges.append((begin, end))
+        edges.append((end, begin))
+        edge_features.append(attr)
+        edge_features.append(attr)
 
-    # Add self loops.
-    for idx in range(mol.GetNumAtoms()):
-        edges.append((idx, idx))
-
-    if not edges:
-        edges = [(0, 0)]
+    for atom_idx in range(mol.GetNumAtoms()):
+        edges.append((atom_idx, atom_idx))
+        edge_features.append(bond_features(None))
 
     edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
-    return Data(x=x, edge_index=edge_index)
-
+    edge_attr = torch.tensor(np.stack(edge_features), dtype=torch.float32)
+    return Data(x=x, edge_index=edge_index, edge_attr=edge_attr)

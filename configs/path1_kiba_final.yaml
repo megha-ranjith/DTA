@@ -1,0 +1,6 @@
+extends: path1_pocket_uncertainty.yaml
+
+dataset: kiba
+results_dir: ./results/kiba_path1_final
+epochs: 15
+save_attention_matrix: true

@@ -1,0 +1,5 @@
+extends: path2_multitask_pose.yaml
+
+results_dir: ./results/path2_final
+epochs: 15
+save_attention_matrix: true

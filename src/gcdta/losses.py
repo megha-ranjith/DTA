@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 
 def info_nce_loss(z1: torch.Tensor, z2: torch.Tensor, temperature: float = 0.2) -> torch.Tensor:
-    """Symmetric InfoNCE over two node embedding views."""
+    """Symmetric InfoNCE with diagonal positives and in-batch negatives."""
     if z1.numel() == 0 or z2.numel() == 0:
         return z1.new_tensor(0.0)
 
@@ -18,4 +18,3 @@ def info_nce_loss(z1: torch.Tensor, z2: torch.Tensor, temperature: float = 0.2) 
     loss_a = F.cross_entropy(logits, labels)
     loss_b = F.cross_entropy(logits.T, labels)
     return 0.5 * (loss_a + loss_b)
-

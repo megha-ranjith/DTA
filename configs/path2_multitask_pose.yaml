@@ -1,0 +1,31 @@
+# Innovation Path 2: Joint Pose and Affinity Prediction
+
+extends: base.yaml
+
+innovations:
+  use_pocket_uncertainty: false
+  use_multitask_pose: true
+  use_knowledge_graph: false
+  use_structural_negatives: false
+
+# Multi-task learning parameters
+multitask_pose:
+  pose_weight: 0.4  # Balance between affinity and pose prediction
+  transformer_heads: 8
+  transformer_layers: 4
+  unified_hidden_dim: 128
+
+# Training adjustments
+epochs: 15
+batch_size: 64
+lr: 0.0001
+
+# Multi-task loss components
+affinity_loss_weight: 1.0
+pose_loss_weight: 0.4
+contrastive_weight: 0.05
+
+# Dropout for regularization
+dropout: 0.2
+
+# You'll need RMSD labels in dataset (from docking software)

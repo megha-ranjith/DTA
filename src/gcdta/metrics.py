@@ -46,6 +46,12 @@ def rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return float(math.sqrt(mse(y_true, y_pred)))
 
 
+def mae(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    y_true = np.asarray(y_true, dtype=np.float64)
+    y_pred = np.asarray(y_pred, dtype=np.float64)
+    return float(np.mean(np.abs(y_true - y_pred)))
+
+
 def pearson_r(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     y_true = np.asarray(y_true, dtype=np.float64)
     y_pred = np.asarray(y_pred, dtype=np.float64)
@@ -62,7 +68,7 @@ def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, floa
     return {
         "ci": concordance_index(y_true, y_pred),
         "mse": mse(y_true, y_pred),
+        "mae": mae(y_true, y_pred),
         "pearson_r": pearson_r(y_true, y_pred),
         "rmse": rmse(y_true, y_pred),
     }
-

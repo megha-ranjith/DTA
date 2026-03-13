@@ -1,0 +1,6 @@
+extends: path2_multitask_pose.yaml
+
+dataset: kiba
+results_dir: ./results/kiba_path2_final
+epochs: 15
+save_attention_matrix: true

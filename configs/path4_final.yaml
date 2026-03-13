@@ -1,0 +1,5 @@
+extends: path4_structural_negatives.yaml
+
+results_dir: ./results/path4_final
+epochs: 15
+save_attention_matrix: true

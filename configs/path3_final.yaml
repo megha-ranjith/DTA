@@ -1,0 +1,5 @@
+extends: path3_knowledge_graph.yaml
+
+results_dir: ./results/path3_final
+epochs: 15
+save_attention_matrix: true

@@ -1,0 +1,6 @@
+extends: base.yaml
+
+dataset: kiba
+results_dir: ./results/kiba_base_final
+epochs: 15
+save_attention_matrix: true

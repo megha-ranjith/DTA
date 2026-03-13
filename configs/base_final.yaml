@@ -1,0 +1,5 @@
+extends: base.yaml
+
+results_dir: ./results/base_final
+epochs: 15
+save_attention_matrix: true

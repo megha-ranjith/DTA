@@ -1,0 +1,87 @@
+# Base GCDTA Configuration
+# All innovations disabled by default
+
+dataset: davis
+data_root: ./data
+results_dir: ./results
+num_workers: 0
+
+# Model featurizer dimensions (auto-set by featurizers.py)
+# Only override if you know what you're doing
+# atom_in_dim: 19  # Atom features
+# bond_in_dim: 6   # Bond features
+# protein_vocab_size: 25  # Protein vocabulary
+# target_physchem_dim: 13  # Physicochemical features
+
+# Model hyperparameters
+hidden_dim: 128
+dropout: 0.2
+temperature: 0.2
+edge_dropout: 0.2
+feature_dropout: 0.1
+contrastive_weight: 0.05
+max_protein_len: 1000
+
+# Training hyperparameters
+epochs: 15
+batch_size: 64
+lr: 0.0001
+weight_decay: 0.00001
+max_protein_len: 1000
+seed: 42
+
+# Scheduler
+scheduler_factor: 0.5
+scheduler_patience: 10
+
+# Data preparation
+prepare_force_download: false
+prepare_force_preprocess: false
+
+# Innovation flags
+innovations:
+  use_pocket_uncertainty: false
+  use_multitask_pose: false
+  use_knowledge_graph: false
+  use_structural_negatives: false
+
+# Pocket Uncertainty parameters (if enabled)
+pocket_uncertainty:
+  use_esmfold: true
+  use_mc_dropout: false  # else Bayesian
+  pocket_radius_angstrom: 8.0
+  gvp_hidden_dim: 128
+  uncertainty_samples: 10  # MC dropout samples
+
+# Multitask Pose parameters (if enabled)
+multitask_pose:
+  pose_weight: 0.3  # L = L_affinity + pose_weight * L_pose
+  transformer_heads: 8
+  transformer_layers: 4
+
+# Knowledge Graph parameters (if enabled)
+knowledge_graph:
+  use_primekg: true
+  use_graphsage: false  # else TransE
+  kg_embedding_dim: 128
+  kg_alignment_weight: 0.1
+  use_textual_alignment: true
+
+# Structural Negatives parameters (if enabled)
+structural_negatives:
+  use_decoydb: true
+  contrastive_weight: 0.2
+  rmsd_weight: true  # weight negatives by RMSD
+
+# Logging
+num_workers: 0
+save_predictions: true
+save_plots: true
+save_attention_matrix: false
+
+# Ablation toggles
+ablations:
+  disable_cross_attention: false
+  disable_contrastive: false
+  disable_physchem: false
+  disable_knowledge_graph: false

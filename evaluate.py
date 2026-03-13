@@ -19,7 +19,10 @@ from gcdta.data.dataset import build_split_datasets, collate_dta_batch
 from gcdta.data.preprocess import prepare_dataset
 from gcdta.metrics import regression_metrics
 from gcdta.runtime import load_checkpoint
-from gcdta.train_utils import ensure_dir, to_device
+from gcdta.train_utils import ensure_dir, save_scatter_plot, set_seed, to_device
+
+
+DATASET_CHOICES = ["davis", "kiba", "core2016", "test71", "test105", "pdbbind_v2016"]
 
 
 @torch.no_grad()
@@ -48,7 +51,7 @@ def test_model(model: nn.Module, loader: DataLoader, device: torch.device) -> Tu
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate GCDTA model on a dataset split.")
-    parser.add_argument("--dataset", type=str, default="davis", choices=["davis", "kiba", "pdbbind_v2016"])
+    parser.add_argument("--dataset", type=str, default="davis", choices=DATASET_CHOICES)
     parser.add_argument("--data-root", type=Path, default=PROJECT_ROOT / "data")
     parser.add_argument("--model-path", type=Path, default=PROJECT_ROOT / "results" / "best_model.pth")
     parser.add_argument("--results-dir", type=Path, default=PROJECT_ROOT / "results")
@@ -62,8 +65,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    torch.manual_seed(args.seed)
-    np.random.seed(args.seed)
+    set_seed(args.seed)
 
     ensure_dir(args.results_dir)
     processed_csv = prepare_dataset(
@@ -73,7 +75,7 @@ def main() -> None:
         force_preprocess=args.prepare_force_preprocess,
         seed=args.seed,
     )
-    splits = build_split_datasets(processed_csv_path=processed_csv, max_protein_len=1024)
+    splits = build_split_datasets(processed_csv_path=processed_csv, max_protein_len=1000)
     test_loader = DataLoader(
         splits.test,
         batch_size=args.batch_size,
@@ -87,6 +89,12 @@ def main() -> None:
 
     y_true, y_pred, test_loss = test_model(model, test_loader, device)
     metrics = regression_metrics(y_true, y_pred)
+    save_scatter_plot(
+        y_true,
+        y_pred,
+        args.results_dir / f"{args.dataset}_scatter_plot.png",
+        title=f"{args.dataset} Predicted vs Actual",
+    )
 
     report_text = (
         f"Evaluation on {args.dataset}:\n"
@@ -94,6 +102,7 @@ def main() -> None:
         f"[Metrics]\n"
         f"  - Concordance Index (CI): {metrics['ci']:.6f}\n"
         f"  - Mean Squared Error (MSE): {metrics['mse']:.6f}\n"
+        f"  - Mean Absolute Error (MAE): {metrics['mae']:.6f}\n"
         f"  - Pearson Correlation (R): {metrics['pearson_r']:.6f}\n"
         f"  - RMSE: {metrics['rmse']:.6f}"
     )
@@ -107,4 +116,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
