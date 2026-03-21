@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import shutil
 import sys
 from typing import Any, Dict, List, Tuple
 
@@ -236,6 +237,26 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def backup_incomplete_run(results_dir: Path) -> None:
+    summary_path = results_dir / "training_summary.json"
+    if not results_dir.exists() or summary_path.exists():
+        return
+
+    existing_files = [path for path in results_dir.iterdir() if path.is_file()]
+    if not existing_files:
+        return
+
+    backup_dir = results_dir.parent / f"{results_dir.name}_incomplete_backup"
+    if backup_dir.exists():
+        shutil.rmtree(backup_dir)
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
+    for path in existing_files:
+        shutil.move(str(path), str(backup_dir / path.name))
+
+    print(f"Backed up incomplete run artifacts to {backup_dir}")
+
+
 def main() -> None:
     args = parse_args()
 
@@ -266,6 +287,7 @@ def main() -> None:
 
     # Setup
     results_dir = Path(config.get("results_dir", "results"))
+    backup_incomplete_run(results_dir)
     set_seed(config.get("seed", 42))
     ensure_dir(results_dir)
     config_save_path = results_dir / "config.json"
@@ -362,6 +384,17 @@ def main() -> None:
         logs.append(
             {"epoch": epoch + 1, "train_loss": train_loss, "val_loss": val_loss, **val_metrics}
         )
+        (results_dir / "progress.json").write_text(
+            json.dumps(
+                {
+                    "epoch": epoch + 1,
+                    "train_loss": train_loss,
+                    "val_loss": val_loss,
+                    "best_val_loss_so_far": min(best_val_loss, val_loss),
+                },
+                indent=2,
+            )
+        )
 
         # Save best model
         if val_loss < best_val_loss:
@@ -428,6 +461,9 @@ def main() -> None:
     save_training_curves(logs, results_dir / "training_curves.png")
     if config.get("save_attention_matrix", False):
         export_attention_matrix(model, test_loader, device, results_dir / "attention_matrix.csv")
+    progress_path = results_dir / "progress.json"
+    if progress_path.exists():
+        progress_path.unlink()
 
     print(f"\nResults saved to {results_dir}")
 
