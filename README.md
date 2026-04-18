@@ -1,258 +1,165 @@
 # KGCL-DTA / GCDTA Project
 
-This repository contains a PyTorch implementation of a GCDTA-style drug-target affinity pipeline and its innovation extensions for the KGCL-DTA thesis work.
+KGCL-DTA is a modular drug-target affinity (DTA) prediction project built around a GCDTA-style graph-sequence backbone and extended with four research paths:
+
+- Path 1: uncertainty-aware pocket modeling
+- Path 2: joint pose-and-affinity style modeling
+- Path 3: knowledge-guided novelty support
+- Path 4: structural hard-negative learning
+
+The project predicts a continuous binding-affinity value from a drug SMILES string and a target protein FASTA sequence.
+
+The current implementation is a working DTA research framework. It implements the architecture and forward logic for all four innovation paths, while the full ESMFold, real docking-pose supervision, curated PrimeKG integration, and DecoyDB-scale pretraining pipelines remain future extensions.
 
 ## Core model
 
-- Drug encoder: RDKit molecular graph + 8-head GAT
-- Target encoder: FASTA token embedding + physicochemical features + dilated CNN
-- Interaction fusion: cross-attention between drug atoms and protein residues
+- Drug encoder: RDKit molecular graph + edge-aware GATv2
+- Target encoder: FASTA token embedding + physicochemical residue features + dilated CNN
+- Interaction fusion: cross-attention between drug atom tokens and protein residue tokens
 - Contrastive branch: heterogeneous graph contrastive learning with InfoNCE
-- Regression head: affinity prediction on the pKd/pKi scale
+- Regression head: continuous affinity prediction
+- KG support: Morgan fingerprint retrieval + KG-style embeddings + mock PrimeKG-style relation demo
 
-## Innovation modules
+## Current verified results
 
-- `pocket_uncertainty`
-- `multitask_pose`
-- `knowledge_graph`
-- `structural_negatives`
+The current final-run story is tradeoff-based, not a single universal winner.
 
-## Repository structure
+| Dataset | Best error behavior | Best ranking/correlation behavior |
+|---|---|---|
+| Davis | Path 1 gives best MSE/RMSE/Pearson: MSE 0.4726, RMSE 0.6874, Pearson 0.6504 | Path 3 gives best CI: 0.8091 |
+| KIBA | Base gives best MSE/RMSE: MSE 0.3967, RMSE 0.6299 | Path 1 gives best CI/Pearson: CI 0.7563, Pearson 0.6547 |
 
-```text
-.
-|-- configs/
-|-- data/
-|   |-- processed/
-|   `-- raw/
-|-- paper_assets/
-|   |-- data/
-|   `-- templates/
-|-- results/
-|-- scripts/
-|-- src/gcdta/
-|-- evaluate.py
-|-- evaluate_innovations.py
-|-- predict.py
-|-- predict_innovations.py
-|-- train.py
-|-- train_innovations.py
-`-- requirements.txt
-```
+Full verified test-set comparison:
+
+| Variant | Davis CI | Davis MSE | Davis RMSE | Davis Pearson | KIBA CI | KIBA MSE | KIBA RMSE | KIBA Pearson |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Base backbone | 0.8034 | 0.4887 | 0.6991 | 0.6267 | 0.7479 | 0.3967 | 0.6299 | 0.6455 |
+| Path 1: Pocket uncertainty | 0.8087 | 0.4726 | 0.6874 | 0.6504 | 0.7563 | 0.4203 | 0.6483 | 0.6547 |
+| Path 2: Multitask pose | 0.8039 | 0.4842 | 0.6958 | 0.6324 | 0.7493 | 0.4088 | 0.6394 | 0.6450 |
+| Path 3: Knowledge graph | 0.8091 | 0.4868 | 0.6977 | 0.6369 | 0.7477 | 0.4308 | 0.6564 | 0.6302 |
+| Path 4: Structural negatives | 0.8058 | 0.4895 | 0.6996 | 0.6303 | 0.7458 | 0.4370 | 0.6611 | 0.6319 |
+
+Do not use older 3-epoch or smoke-test metrics as thesis results.
 
 ## Installation
 
-Install Python dependencies:
-
-```bash
+```powershell
 pip install -r requirements.txt
 ```
 
-For paper figures, install R and the packages used by `scripts/generate_paper_figures.R`:
-
-```r
-install.packages(c("ggplot2", "patchwork", "readr", "dplyr", "tidyr"))
-```
+For paper figures, install R and packages used by `scripts/generate_paper_figures.R`.
 
 ## Dataset preparation
 
-Download and preprocess all supported datasets into `data/`:
-
-```bash
-python scripts/prepare_data.py --dataset all
+```powershell
+python scripts\prepare_data.py --dataset all
 ```
 
-Supported datasets:
+Supported dataset names include `davis`, `kiba`, `core2016`, `test71`, `test105`, and `pdbbind_v2016`.
 
-- `davis`
-- `kiba`
-- `core2016`
-- `test71`
-- `test105`
-- `pdbbind_v2016`
+Core 2016/PDBbind support is available for future structure-aware benchmarking, but current thesis metrics are Davis/KIBA final runs.
 
-## Base training
+## Training
 
-Train the baseline GCDTA model:
-
-```bash
-python train.py --dataset davis
-```
-
-## Innovation training
-
-Smoke-test style training:
-
-```bash
-python train_innovations.py --config configs/base.yaml --epochs 3
-python train_innovations.py --config configs/path1_pocket_uncertainty.yaml --epochs 3
-python train_innovations.py --config configs/path2_multitask_pose.yaml --epochs 3
-python train_innovations.py --config configs/path3_knowledge_graph.yaml --epochs 3
-python train_innovations.py --config configs/path4_structural_negatives.yaml --epochs 3
-```
-
-Final Davis experiment configs:
-
-```bash
-python train_innovations.py --config configs/base_final.yaml
-python train_innovations.py --config configs/path1_final.yaml
-python train_innovations.py --config configs/path2_final.yaml
-python train_innovations.py --config configs/path3_final.yaml
-python train_innovations.py --config configs/path4_final.yaml
-```
-
-Final KIBA experiment configs:
-
-```bash
-python train_innovations.py --config configs/base_kiba_final.yaml
-python train_innovations.py --config configs/path1_kiba_final.yaml
-python train_innovations.py --config configs/path2_kiba_final.yaml
-python train_innovations.py --config configs/path3_kiba_final.yaml
-python train_innovations.py --config configs/path4_kiba_final.yaml
-```
-
-Batch runners:
+Final Davis runs:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\run_final_experiments.ps1
-powershell -ExecutionPolicy Bypass -File scripts\run_kiba_final_experiments.ps1
-powershell -ExecutionPolicy Bypass -File scripts\run_ablation_experiments.ps1
+python train_innovations.py --config configs\base_final.yaml
+python train_innovations.py --config configs\path1_final.yaml
+python train_innovations.py --config configs\path2_final.yaml
+python train_innovations.py --config configs\path3_final.yaml
+python train_innovations.py --config configs\path4_final.yaml
 ```
 
-## Ablation runs
+Final KIBA runs:
 
-Ready-made ablation configs:
-
-```bash
-python train_innovations.py --config configs/ablation_no_cross_attention.yaml
-python train_innovations.py --config configs/ablation_no_contrastive.yaml
-python train_innovations.py --config configs/ablation_no_physchem.yaml
-python train_innovations.py --config configs/ablation_no_kg.yaml
+```powershell
+python train_innovations.py --config configs\base_kiba_final.yaml
+python train_innovations.py --config configs\path1_kiba_final.yaml
+python train_innovations.py --config configs\path2_kiba_final.yaml
+python train_innovations.py --config configs\path3_kiba_final.yaml
+python train_innovations.py --config configs\path4_kiba_final.yaml
 ```
 
-Supported ablation toggles in config:
+Ablation configs are prepared, but missing ablation values should not be fabricated:
 
-```yaml
-ablations:
-  disable_cross_attention: false
-  disable_contrastive: false
-  disable_physchem: false
-  disable_knowledge_graph: false
+```powershell
+python train_innovations.py --config configs\ablation_no_cross_attention.yaml
+python train_innovations.py --config configs\ablation_no_contrastive.yaml
+python train_innovations.py --config configs\ablation_no_physchem.yaml
+python train_innovations.py --config configs\ablation_no_kg.yaml
 ```
 
-## Evaluation
+## Prediction and evaluation
 
-Base model:
+Base prediction:
 
-```bash
-python evaluate.py --dataset davis --model-path results/best_model.pth
+```powershell
+python predict.py --model-path results\base_final\best_model.pth --smiles "CCO" --fasta "MKWVTFISLLFLFSSAYSRGVFRRDTHKSEIAHRFKDLGE"
 ```
 
-Innovation comparison:
+Innovation prediction:
 
-```bash
-python evaluate_innovations.py --dataset davis --model-path results/best_model.pth --compare-all
+```powershell
+python predict_innovations.py --model-path results\path3_final\best_model.pth --config configs\path3_knowledge_graph.yaml --smiles "CCO" --fasta "MKWVTFISLLFLFSSAYSRGVFRRDTHKSEIAHRFKDLGE" --dataset davis
 ```
 
-## Prediction
+Dataset-level evaluation:
 
-Base single-pair prediction:
-
-```bash
-python predict.py --model-path results/best_model.pth --smiles "CCO" --fasta "MKWVTFISLLFLFSSAYSRGVFRRDTHKSEIAHRFKDLGE"
+```powershell
+python evaluate_innovations.py --model-path results\path3_final\best_model.pth --config configs\path3_knowledge_graph.yaml --dataset davis --output-dir results\demo_eval_path3
 ```
 
-Innovation comparison on a single pair:
+## Demo tools
 
-```bash
-python predict_innovations.py --model-path results/best_model.pth --smiles "CCO" --fasta "MKWVTFISLLFLFSSAYSRGVFRRDTHKSEIAHRFKDLGE" --compare-all
+Local molecule and pipeline viewer:
+
+```powershell
+python smiles_3d_gui.py
 ```
 
-## What each final run saves
+This shows SMILES-to-2D/3D RDKit visualization, molecule statistics, drug graph construction, protein feature analysis, and the KGCL-DTA pipeline. The 3D molecule is an RDKit-generated conformer for visualization, not an experimentally solved docking pose.
 
-Each final or ablation result folder now contains paper-usable outputs such as:
+Optional web-style demo:
 
-- `best_model.pth`
-- `config.json`
-- `logs.csv`
-- `training_summary.json`
-- `validation_predictions.csv`
-- `test_predictions.csv`
-- `predictions_scatter.png`
-- `training_curves.png`
-- `attention_matrix.csv` when `save_attention_matrix: true`
-
-These CSV exports are intended for paper plots, heatmaps, scatter figures, and comparison tables.
-
-## Metrics aggregation
-
-After final runs complete, aggregate validation and test metrics:
-
-```bash
-python scripts/compare_final_runs.py
+```powershell
+streamlit run streamlit_app.py
 ```
 
-This writes:
+Use it for viva convenience only; benchmark claims should come from saved Davis/KIBA evaluations.
 
-- `paper_assets/data/final_runs_metrics.csv`
+## Unseen-split and mock-KG support
 
-## Paper figure generation in R
+Create scaffold/protein-cluster split files:
 
-Dataset distributions:
-
-```bash
-Rscript scripts/generate_paper_figures.R distributions
+```powershell
+python scripts\create_unseen_splits.py --dataset davis --mode both
+python scripts\create_unseen_splits.py --dataset kiba --mode both
 ```
 
-Training curves:
+Build mock PrimeKG-style graph files:
 
-```bash
-Rscript scripts/generate_paper_figures.R training_curves
+```powershell
+python scripts\build_mock_primekg.py --dataset davis
+python scripts\build_mock_primekg.py --dataset kiba
 ```
 
-Scatter plots from exported run CSVs:
+These are support tools. They should be described as prepared infrastructure unless full training/evaluation is performed on the generated splits or real PrimeKG data.
 
-```bash
-Rscript scripts/generate_paper_figures.R scatter_from_runs
+## Paper figures
+
+```powershell
+Rscript scripts\generate_paper_figures.R distributions
+Rscript scripts\generate_paper_figures.R thesis_variant_comparison
+Rscript scripts\generate_paper_figures.R thesis_training_curves
+Rscript scripts\generate_paper_figures.R thesis_attention_panels
+Rscript scripts\generate_paper_figures.R metrics_heatmap
 ```
 
-Performance bar plots:
+Generated figures are written to `results/paper_figures/`.
 
-```bash
-Rscript scripts/generate_paper_figures.R performance
-```
+## Thesis-safe framing
 
-Ablation plots:
+Use this wording:
 
-```bash
-Rscript scripts/generate_paper_figures.R ablation
-```
-
-Cross-attention heatmap from exported attention matrix:
-
-```bash
-Rscript scripts/generate_paper_figures.R attention_from_run
-```
-
-Metrics heatmap from aggregated final runs:
-
-```bash
-Rscript scripts/generate_paper_figures.R metrics_heatmap
-```
-
-KG case-study figure:
-
-```bash
-Rscript scripts/generate_paper_figures.R kg_case
-```
-
-All generated paper figures are written to:
-
-- `results/paper_figures/`
-
-## Notes
-
-- The earlier 3-epoch runs are smoke tests only. They should not be used as final paper results.
-- The distribution plots are dataset-based and do not change when you retrain.
-- Scatter plots, performance bars, ablation plots, training curves, and heatmaps depend on final experiment outputs.
-- Existing old checkpoints may be incompatible with the current model definition. Retraining is required for stable evaluation.
+> KGCL-DTA implements a multimodal graph-sequence DTA backbone with four architectural innovation paths: uncertainty-aware pocket modeling, multitask pose-style prediction, knowledge-guided novelty support, and structural hard-negative learning. Current Davis/KIBA results show tradeoffs across metrics rather than one universally dominant variant. Full ESMFold, real PrimeKG, pose-supervised, DecoyDB, and multi-seed studies remain future work.
