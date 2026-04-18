@@ -26,7 +26,7 @@ from gcdta.innovation_runtime import (
     run_innovation_forward,
     summarize_path_output,
 )
-from gcdta.metrics import regression_metrics
+from gcdta.metrics import regression_metrics, uncertainty_metrics
 from gcdta.train_utils import save_scatter_plot, set_seed, to_device
 
 
@@ -86,6 +86,10 @@ def evaluate_single_path(
     y_true = torch.cat(all_true).numpy()
     y_pred = torch.cat(all_pred).numpy()
     metrics = regression_metrics(y_true, y_pred)
+    if uncertainty_values:
+        variance = torch.cat(uncertainty_values).numpy()
+        if variance.shape[0] == y_true.shape[0]:
+            metrics.update(uncertainty_metrics(y_true, y_pred, variance))
 
     path_name, label = _infer_path_metadata(config_name)
     outputs_for_summary: Dict[str, Any] = {
@@ -164,6 +168,9 @@ def main() -> None:
             print(f"  MAE: {metrics['mae']:.6f}")
             print(f"  Pearson R: {metrics['pearson_r']:.6f}")
             print(f"  RMSE: {metrics['rmse']:.6f}")
+            if "picp" in metrics:
+                print(f"  PICP: {metrics['picp']:.6f}")
+                print(f"  Mean Interval Width: {metrics['mean_interval_width']:.6f}")
         output = {
             path: {
                 "label": payload["label"],
@@ -183,6 +190,10 @@ def main() -> None:
     print(f"  - Mean Absolute Error (MAE): {metrics['mae']:.6f}")
     print(f"  - Pearson Correlation (R): {metrics['pearson_r']:.6f}")
     print(f"  - RMSE: {metrics['rmse']:.6f}")
+    if "picp" in metrics:
+        print(f"  - PICP: {metrics['picp']:.6f}")
+        print(f"  - Mean Interval Width: {metrics['mean_interval_width']:.6f}")
+        print(f"  - Mean Uncertainty Std: {metrics['mean_uncertainty_std']:.6f}")
     print("--------------------------------------------------")
     print(format_comparison_table({summary.path: summary}))
 
