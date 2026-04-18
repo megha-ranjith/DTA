@@ -64,6 +64,40 @@ def pearson_r(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return float(np.corrcoef(y_true, y_pred)[0, 1])
 
 
+def picp(y_true: np.ndarray, lower: np.ndarray, upper: np.ndarray) -> float:
+    """Prediction interval coverage probability."""
+    y_true = np.asarray(y_true, dtype=np.float64)
+    lower = np.asarray(lower, dtype=np.float64)
+    upper = np.asarray(upper, dtype=np.float64)
+    if y_true.size == 0:
+        return 0.0
+    return float(np.mean((y_true >= lower) & (y_true <= upper)))
+
+
+def mean_interval_width(lower: np.ndarray, upper: np.ndarray) -> float:
+    """Average width of prediction intervals."""
+    lower = np.asarray(lower, dtype=np.float64)
+    upper = np.asarray(upper, dtype=np.float64)
+    if lower.size == 0:
+        return 0.0
+    return float(np.mean(upper - lower))
+
+
+def uncertainty_metrics(y_true: np.ndarray, y_pred: np.ndarray, variance: np.ndarray, z: float = 1.96) -> Dict[str, float]:
+    """Compute simple interval metrics from predictive variance."""
+    y_true = np.asarray(y_true, dtype=np.float64)
+    y_pred = np.asarray(y_pred, dtype=np.float64)
+    variance = np.asarray(variance, dtype=np.float64)
+    std = np.sqrt(np.clip(variance, a_min=0.0, a_max=None))
+    lower = y_pred - z * std
+    upper = y_pred + z * std
+    return {
+        "picp": picp(y_true, lower, upper),
+        "mean_interval_width": mean_interval_width(lower, upper),
+        "mean_uncertainty_std": float(np.mean(std)) if std.size else 0.0,
+    }
+
+
 def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
     return {
         "ci": concordance_index(y_true, y_pred),
